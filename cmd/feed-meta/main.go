@@ -26,6 +26,10 @@ func main() {
 	fmt.Fprintln(w, "File\tTitle\tDescription")
 
 	for _, fileEntry := range files {
+		if fileEntry.Name() == ".gitkeep" {
+			continue
+		}
+
 		file, err := os.Open(filepath.Join(xmlDir, fileEntry.Name()))
 		if err != nil {
 			log.Fatal(err)
