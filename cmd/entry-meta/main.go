@@ -1,85 +1,17 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"log"
 	"os"
-	"strings"
-	"text/tabwriter"
+	"runtime"
+	"sync"
+	"time"
 
-	textrank "github.com/DavidBelicza/TextRank/v2"
-	"github.com/DavidBelicza/TextRank/v2/convert"
-	"github.com/DavidBelicza/TextRank/v2/parse"
-	"github.com/DavidBelicza/TextRank/v2/rank"
-	"github.com/jaytaylor/html2text"
 	"github.com/mmcdole/gofeed"
+	"github.com/sourcegraph/conc/pool"
 )
-
-var (
-	maxLen = 100
-
-	keywordReplacer = strings.NewReplacer(
-		"/", " ",
-		".", " ",
-		"-", " ",
-		":", " ",
-	)
-)
-
-type Extractor struct {
-	html2textOptions html2text.Options
-
-	textRankLanguage  convert.Language
-	textRankRule      parse.Rule
-	textRankAlgorithm rank.Algorithm
-}
-
-func NewExtractor() Extractor {
-	return Extractor{
-		html2textOptions: html2text.Options{
-			OmitLinks: true,
-			TextOnly:  true,
-		},
-		textRankLanguage:  textrank.NewDefaultLanguage(),
-		textRankAlgorithm: textrank.NewDefaultAlgorithm(),
-		textRankRule:      textrank.NewDefaultRule(),
-	}
-}
-
-func (e *Extractor) ExtractKeyPhrases(htmlDescription string) ([]string, error) {
-	description, err := html2text.FromString(htmlDescription, e.html2textOptions)
-	if err != nil {
-		return []string{}, err
-	}
-
-	description = normalizeDescription(description)
-
-	tr := textrank.NewTextRank()
-	tr.Populate(description, e.textRankLanguage, e.textRankRule)
-	tr.Ranking(e.textRankAlgorithm)
-
-	rankedPhrases := textrank.FindPhrases(tr)
-
-	phrases := make([]string, len(rankedPhrases))
-
-	for i, rankedPhrase := range rankedPhrases {
-		phrases[i] = fmt.Sprintf("%s %s", rankedPhrase.Left, rankedPhrase.Right)
-	}
-
-	nItems := 10
-	if len(phrases) < nItems {
-		nItems = len(phrases)
-	}
-
-	return phrases[:nItems], nil
-}
-
-func normalizeDescription(keyword string) string {
-	keyword = strings.TrimSpace(keyword)
-	keyword = keywordReplacer.Replace(keyword)
-
-	return keyword
-}
 
 func main() {
 	xmlFile := os.Args[1]
@@ -90,60 +22,48 @@ func main() {
 	}
 	defer file.Close()
 
-	fp := gofeed.NewParser()
+	feedParser := gofeed.NewParser()
+	extractor := NewExtractor()
 
-	feed, err := fp.Parse(file)
+	start := time.Now()
+
+	feed, err := feedParser.Parse(file)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	extractor := NewExtractor()
+	nWorkers := cmp.Or(runtime.NumCPU()/2, 2)
+	workerPool := pool.New().WithErrors().WithMaxGoroutines(nWorkers)
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "Title\tAuthors\tDescLen\tConLen\tWords")
+	entries := make(Entries, len(feed.Items))
+	var entriesLocker sync.Mutex
 
-	for _, entry := range feed.Items {
-		var authorNames []string
-
-		for _, author := range entry.Authors {
-			names := strings.Split(author.Name, " and ")
-
-			for _, name := range names {
-				name := strings.TrimSpace(name)
-				if name == "" {
-					continue
-				}
-
-				authorNames = append(authorNames, name)
-			}
-		}
-
-		var phrases []string
-
-		switch {
-		case len(entry.Description) > 20:
-			phrases, err = extractor.ExtractKeyPhrases(entry.Description)
+	for i, item := range feed.Items {
+		workerPool.Go(func() error {
+			entry, err := NewEntryFromItem(extractor, item)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
-		case len(entry.Content) > 20:
-			phrases, err = extractor.ExtractKeyPhrases(entry.Content)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
+			entriesLocker.Lock()
+			entries[i] = entry
+			entriesLocker.Unlock()
 
-		fmt.Fprintf(
-			w,
-			"%s\t%s\t%d\t%d\t%s\n",
-			entry.Title,
-			strings.Join(authorNames, " & "),
-			len(entry.Description),
-			len(entry.Content),
-			strings.Join(phrases, ", "),
-		)
+			return nil
+		})
 	}
 
-	w.Flush()
+	if err := workerPool.Wait(); err != nil {
+		log.Fatal(err)
+	}
+
+	entries.Summary(os.Stdout)
+
+	elapsed := time.Since(start)
+	fmt.Printf(
+		"%d entries processed in %d ms (%d jobs)\n",
+		len(feed.Items),
+		elapsed.Milliseconds(),
+		nWorkers,
+	)
 }

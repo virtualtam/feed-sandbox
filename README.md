@@ -53,5 +53,6 @@ This toy project uses the following libraries (in order of appearance):
 
 - [mmcdole/gofeed](https://github.com/mmcdole/gofeed) to parse Atom, RSS and JSON feeds
 - [gosimple/slug](https://github.com/gosimple/slug) to turn feed titles into normalized slugs that can be used to build filenames
+- [sourcegraph/conc](https://github.com/sourcegraph/conc) to allocate a worker pool to process feed entries concurrently
 - [jaytaylor/html2text](https://github.com/jaytaylor/html2text) to convert raw entry descriptions to plain text
 - [DavidBelicza/TextRank](https://github.com/DavidBelicza/TextRank) to extract key phrases from entry descriptions
