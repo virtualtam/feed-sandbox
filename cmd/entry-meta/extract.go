@@ -2,22 +2,13 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	textrank "github.com/DavidBelicza/TextRank/v2"
 	"github.com/DavidBelicza/TextRank/v2/convert"
 	"github.com/DavidBelicza/TextRank/v2/parse"
 	"github.com/DavidBelicza/TextRank/v2/rank"
+	anyascii "github.com/anyascii/go"
 	"github.com/jaytaylor/html2text"
-)
-
-var (
-	keywordReplacer = strings.NewReplacer(
-		"/", " ",
-		".", " ",
-		"-", " ",
-		":", " ",
-	)
 )
 
 type Extractor struct {
@@ -46,6 +37,7 @@ func (e *Extractor) ExtractKeyPhrases(htmlDescription string) ([]string, error) 
 		return []string{}, err
 	}
 
+	description = anyascii.Transliterate(description)
 	description = normalizeText(description)
 
 	tr := textrank.NewTextRank()
@@ -66,11 +58,4 @@ func (e *Extractor) ExtractKeyPhrases(htmlDescription string) ([]string, error) 
 	}
 
 	return phrases[:nItems], nil
-}
-
-func normalizeText(text string) string {
-	text = strings.TrimSpace(text)
-	text = keywordReplacer.Replace(text)
-
-	return text
 }

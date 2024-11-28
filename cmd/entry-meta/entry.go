@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 
@@ -17,11 +18,15 @@ type Entry struct {
 	Phrases     []string
 }
 
+var (
+	authorSeparatorRegexp = regexp.MustCompile("(,| and )")
+)
+
 func NewEntryFromItem(extractor *Extractor, item *gofeed.Item) (Entry, error) {
 	var authorNames []string
 
 	for _, author := range item.Authors {
-		names := strings.Split(author.Name, " and ")
+		names := authorSeparatorRegexp.Split(author.Name, -1)
 
 		for _, name := range names {
 			name := strings.TrimSpace(name)
@@ -70,7 +75,7 @@ func (es *Entries) Summary(output io.Writer) {
 			w,
 			"%s\t%s\t%d\t%d\t%s\n",
 			entry.Title,
-			strings.Join(entry.Authors, " & "),
+			strings.Join(entry.Authors, " / "),
 			len(entry.Description),
 			len(entry.Content),
 			strings.Join(entry.Phrases, ", "),
