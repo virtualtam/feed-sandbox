@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,19 +15,22 @@ import (
 )
 
 func main() {
-	xmlFile := os.Args[1]
+	if len(os.Args) != 2 {
+		fmt.Fprintf(os.Stderr, "Usage: %s <feed.xml>\n", os.Args[0])
+		os.Exit(1)
+	}
 
+	xmlFile := os.Args[1]
 	file, err := os.Open(xmlFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-	feedParser := gofeed.NewParser()
-	extractor := NewExtractor()
-
 	start := time.Now()
 
+	// Parse feed
+	feedParser := gofeed.NewParser()
 	feed, err := feedParser.Parse(file)
 	if err != nil {
 		log.Fatal(err)
@@ -40,7 +44,7 @@ func main() {
 
 	for i, item := range feed.Items {
 		workerPool.Go(func() error {
-			entry, err := NewEntryFromItem(extractor, item)
+			entry, err := NewEntryFromItem(item)
 			if err != nil {
 				return err
 			}
@@ -57,13 +61,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	entries.Summary(os.Stdout)
+	entries.WriteInfo(os.Stdout)
 
 	elapsed := time.Since(start)
-	fmt.Printf(
-		"%d entries processed in %d ms (%d jobs)\n",
-		len(feed.Items),
-		elapsed.Milliseconds(),
-		nWorkers,
-	)
+	fmt.Println(strings.Repeat("-", 80))
+	fmt.Printf("Processed %d entries in %s\n", len(feed.Items), elapsed)
 }

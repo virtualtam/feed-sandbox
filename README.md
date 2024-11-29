@@ -1,7 +1,10 @@
 # feed-sandbox
 
-A toy project to experiment with extracting and transforming metadata for Atom and RSS feeds
-using Go libraries.
+A toy project to experiment with Atom and RSS feed processing:
+
+- extract and normalize metadata
+- summarize entrydescription and content
+- extract keywords with TextRank
 
 These experiments are conducted with the goal of improving full-text search features in
 [SparkleMuffin](https://github.com/virtualtam/sparklemuffin).
@@ -19,9 +22,9 @@ https://domain.tld/feed
 https://blog.domain2.tld/rss
 ```
 
-## Usage
+## Tools
 ### `fetch` - Download feed data
-Download XML data for all feed URLs in `feeds.csv`:
+Download feeds from URLs listed in `feeds.csv` and store them as XML files:
 
 ```shell
 $ go run ./cmd/fetch
@@ -37,12 +40,12 @@ Print feed metadata for all downloaded XML files:
 $ go run ./cmd/feed-meta
 ```
 
-### `entry-meta` - Print entry metadata for a feed
+### `entry-textrank` - Process entry metadata and extract keywords with TextRank
 
-Print entry metadata for a given feed:
+Extract keywords for a given feed:
 
 ```shell
-$ go run ./cmd/entry-meta xml/myfeed.xml
+$ go run ./cmd/entry-textrank xml/myfeed.xml
 ```
 
 ## LICENSE
