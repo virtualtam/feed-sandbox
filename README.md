@@ -3,7 +3,7 @@
 A toy project to experiment with Atom and RSS feed processing:
 
 - extract and normalize metadata
-- summarize entrydescription and content
+- summarize entry description and content
 - extract keywords with TextRank
 
 These experiments are conducted with the goal of improving full-text search features in
