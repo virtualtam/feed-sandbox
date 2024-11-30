@@ -30,8 +30,11 @@ type Entry struct {
 	// Computed fields
 	Summary            string
 	DescriptionPhrases []string
+	DescriptionWords   []string
 	ContentPhrases     []string
+	ContentWords       []string
 	SummaryPhrases     []string
+	SummaryWords       []string
 }
 
 func NewEntryFromItem(item *gofeed.Item) (Entry, error) {
@@ -97,11 +100,6 @@ func buildSummaryFromParagraphs(paragraphs []string, maxLength int) string {
 			continue
 		}
 
-		// Add separator between paragraphs
-		if summary.Len() > 0 {
-			summary.WriteString(" ")
-		}
-
 		// Check if adding this paragraph would exceed maxLength
 		if summary.Len()+len(p) > maxLength {
 			// If this is the first paragraph, take what we can
@@ -112,6 +110,11 @@ func buildSummaryFromParagraphs(paragraphs []string, maxLength int) string {
 			break
 		}
 
+		// Add separator between paragraphs
+		if summary.Len() > 0 {
+			summary.WriteString("\n\n")
+		}
+
 		summary.WriteString(p)
 	}
 
@@ -120,8 +123,8 @@ func buildSummaryFromParagraphs(paragraphs []string, maxLength int) string {
 
 func (e *Entry) Summarize() {
 	const (
-		shortLength = 100 // Length to consider text "short enough" as is
-		maxLength   = 200 // Maximum length for multi-paragraph summary
+		shortLength = 200 // Length to consider text "short enough" as is
+		maxLength   = 400 // Maximum length for multi-paragraph summary
 	)
 
 	// early return: nothing to summarize
@@ -162,21 +165,21 @@ func (e *Entry) ComputePhrases() error {
 	var err error
 
 	if e.Description != "" {
-		e.DescriptionPhrases, err = TextRankPhrases(e.Description)
+		e.DescriptionPhrases, e.DescriptionWords, err = TextRankPhrases(e.Description)
 		if err != nil {
 			return err
 		}
 	}
 
 	if e.Content != "" {
-		e.ContentPhrases, err = TextRankPhrases(e.Content)
+		e.ContentPhrases, e.ContentWords, err = TextRankPhrases(e.Content)
 		if err != nil {
 			return err
 		}
 	}
 
 	if e.Summary != "" {
-		e.SummaryPhrases, err = TextRankPhrases(e.Summary)
+		e.SummaryPhrases, e.SummaryWords, err = TextRankPhrases(e.Summary)
 		if err != nil {
 			return err
 		}
@@ -185,11 +188,11 @@ func (e *Entry) ComputePhrases() error {
 	return nil
 }
 
-func writePhrases(w io.Writer, label string, phrases []string) {
-	if len(phrases) == 0 {
+func writeSlice(w io.Writer, field string, label string, items []string) {
+	if len(items) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "%s phrases:\t%s\n", label, strings.Join(phrases, ", "))
+	fmt.Fprintf(w, "%s %s:\t%s\n", field, label, strings.Join(items, ", "))
 }
 
 func (e *Entry) WriteInfo(output io.Writer) {
@@ -218,9 +221,13 @@ func (e *Entry) WriteInfo(output io.Writer) {
 
 	fmt.Fprintln(output)
 
-	writePhrases(output, "Summary", e.SummaryPhrases)
-	writePhrases(output, "Description", e.DescriptionPhrases)
-	writePhrases(output, "Content", e.ContentPhrases)
+	writeSlice(output, "Summary", "phrases", e.SummaryPhrases)
+	writeSlice(output, "Description", "phrases", e.DescriptionPhrases)
+	writeSlice(output, "Content", "phrases", e.ContentPhrases)
+
+	writeSlice(output, "Summary", "words", e.SummaryWords)
+	writeSlice(output, "Description", "words", e.DescriptionWords)
+	writeSlice(output, "Content", "words", e.ContentWords)
 
 	if e.Description == "" && e.Content == "" {
 		fmt.Fprintln(output, "No text content available")

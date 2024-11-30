@@ -19,9 +19,11 @@ var (
 		":", " ",
 		"-", " ",
 	)
+
+	nItems = 10
 )
 
-func TextRankPhrases(text string) ([]string, error) {
+func TextRankPhrases(text string) ([]string, []string, error) {
 	text = anyascii.Transliterate(text)
 	text = keywordReplacer.Replace(text)
 
@@ -29,18 +31,33 @@ func TextRankPhrases(text string) ([]string, error) {
 	tr.Populate(text, textRankLanguage, textRankRule)
 	tr.Ranking(textRankAlgorithm)
 
+	// extract phrases
 	rankedPhrases := textrank.FindPhrases(tr)
 
-	phrases := make([]string, len(rankedPhrases))
-
-	for i, rankedPhrase := range rankedPhrases {
-		phrases[i] = fmt.Sprintf("%s %s", rankedPhrase.Left, rankedPhrase.Right)
+	nPhrases := nItems
+	if len(rankedPhrases) < nItems {
+		nPhrases = len(rankedPhrases)
 	}
 
-	nItems := 10
-	if len(phrases) < nItems {
-		nItems = len(phrases)
+	phrases := make([]string, nPhrases)
+
+	for i := 0; i < nPhrases; i++ {
+		phrases[i] = fmt.Sprintf("%s %s", rankedPhrases[i].Left, rankedPhrases[i].Right)
 	}
 
-	return phrases[:nItems], nil
+	// extract single words
+	rankedWords := textrank.FindSingleWords(tr)
+
+	nWords := nItems
+	if len(rankedWords) < nItems {
+		nWords = len(rankedWords)
+	}
+
+	words := make([]string, nWords)
+
+	for i := 0; i < nWords; i++ {
+		words[i] = rankedWords[i].Word
+	}
+
+	return phrases, words, nil
 }
